@@ -38,12 +38,15 @@ public enum ShelfError: LocalizedError, Equatable {
 /// Reading and writing the on-disk format: `{ "version": 1, "items": [...] }`.
 public enum ShelfFormat {
     public static func decode(_ data: Data) throws -> [ShelfItem] {
-        guard (try? JSONSerialization.jsonObject(with: data, options: .fragmentsAllowed)) != nil else {
+        let file: RawFile
+        do {
+            file = try JSONDecoder().decode(RawFile.self, from: data)
+        } catch DecodingError.dataCorrupted {
             throw ShelfError.invalidJSON
-        }
-        guard let file = try? JSONDecoder().decode(RawFile.self, from: data), file.version == 1 else {
+        } catch {
             throw ShelfError.invalidFormat
         }
+        guard file.version == 1 else { throw ShelfError.invalidFormat }
 
         var items: [ShelfItem] = []
         items.reserveCapacity(file.items.count)

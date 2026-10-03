@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds a universal (Apple Silicon + Intel), ad-hoc signed CopyShelf.app into ./dist.
+# Builds an Apple Silicon, ad-hoc signed CopyShelf.app into ./dist.
 # Works with just the Xcode Command Line Tools — no Xcode project needed.
 #
 # Usage: scripts/build-app.sh            (version from ./VERSION)
@@ -12,17 +12,12 @@ BUILD="${BUILD:-$(git rev-list --count HEAD 2>/dev/null || echo 1)}"
 APP="dist/CopyShelf.app"
 
 echo "▸ Building CopyShelf $VERSION ($BUILD)"
-for arch in arm64 x86_64; do
-  swift build -c release --arch "$arch" --product CopyShelf -Xswiftc -Osize >/dev/null
-done
+swift build -c release --arch arm64 --product CopyShelf -Xswiftc -Osize >/dev/null
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
-lipo -create \
-  .build/arm64-apple-macosx/release/CopyShelf \
-  .build/x86_64-apple-macosx/release/CopyShelf \
-  -output "$APP/Contents/MacOS/CopyShelf"
+cp .build/arm64-apple-macosx/release/CopyShelf "$APP/Contents/MacOS/CopyShelf"
 strip -x "$APP/Contents/MacOS/CopyShelf"
 
 sed -e "s/__VERSION__/$VERSION/" -e "s/__BUILD__/$BUILD/" Resources/Info.plist > "$APP/Contents/Info.plist"

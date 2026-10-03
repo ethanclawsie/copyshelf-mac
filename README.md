@@ -2,7 +2,7 @@
 
 A tiny menu bar app for keeping reusable text close at hand. Click the icon, click an item, and it's on your clipboard — ready to paste into any app.
 
-Native SwiftUI, no dependencies, no Dock icon, no background polling.
+Native SwiftUI, no dependencies, no Dock icon, no background polling. Requires an Apple Silicon Mac on macOS 14+.
 
 ## Install
 

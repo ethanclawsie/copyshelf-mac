@@ -7,6 +7,7 @@ cask "copyshelf" do
   desc "Menu bar shelf of reusable text snippets — click to copy"
   homepage "https://github.com/ethanclawsie/copyshelf-mac"
 
+  depends_on arch: :arm64
   depends_on macos: ">= :sonoma"
 
   app "CopyShelf.app"

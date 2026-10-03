@@ -108,7 +108,7 @@ public final class ShelfStore {
 
     public func export(to url: URL) throws {
         reloadIfChanged()
-        if let loadError { throw ExportError(message: loadError) }
+        guard loadError == nil else { throw ShelfError.storageLocked }
         try ShelfFormat.encode(items).write(to: url, options: .atomic)
     }
 
@@ -133,9 +133,4 @@ public final class ShelfStore {
     private func modificationDate() -> Date? {
         (try? FileManager.default.attributesOfItem(atPath: fileURL.path))?[.modificationDate] as? Date
     }
-}
-
-private struct ExportError: LocalizedError {
-    let message: String
-    var errorDescription: String? { message }
 }
