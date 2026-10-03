@@ -39,7 +39,7 @@ Items are saved to:
 ~/Library/Application Support/CopyShelf/copyshelf.json
 ```
 
-It uses the same format as the CopyShelf VS Code extension, so files can be imported/exported between them (the two keep separate shelves):
+It's a plain, readable JSON file:
 
 ```json
 {
