@@ -104,7 +104,6 @@ final class MouseTrigger {
     private func installTap() {
         let mask = (1 << CGEventType.otherMouseDown.rawValue)
             | (1 << CGEventType.otherMouseUp.rawValue)
-            | (1 << CGEventType.otherMouseDragged.rawValue)
         activeTrigger = self
         guard let tap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,

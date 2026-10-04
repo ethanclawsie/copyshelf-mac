@@ -64,7 +64,7 @@ func tempFile() -> URL {
         }
     }
 
-    print("• Reads the VS Code extension's format")
+    print("• Reads the JSON storage format")
     do {
         let json = """
         {
@@ -120,7 +120,7 @@ func tempFile() -> URL {
         check(String(decoding: try ShelfFormat.encode([]), as: UTF8.self) == "{\n  \"version\": 1,\n  \"items\": []\n}\n", "empty shelf matches")
     }
 
-    print("• Rejects malformed data with the VS Code error cases")
+    print("• Rejects malformed data with standard error cases")
     expectError(.invalidJSON, "not JSON") { _ = try ShelfFormat.decode(Data("{nope".utf8)) }
     expectError(.invalidFormat, "wrong version") { _ = try ShelfFormat.decode(Data(#"{"version":2,"items":[]}"#.utf8)) }
     expectError(.invalidFormat, "missing items") { _ = try ShelfFormat.decode(Data(#"{"version":1}"#.utf8)) }

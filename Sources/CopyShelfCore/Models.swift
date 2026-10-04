@@ -1,6 +1,6 @@
 import Foundation
 
-/// A single saved snippet. Field names and order match the VS Code extension's `copyshelf.json`.
+/// A single saved snippet.
 public struct ShelfItem: Codable, Identifiable, Equatable, Sendable {
     public var id: String
     public var title: String

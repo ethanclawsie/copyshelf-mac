@@ -41,7 +41,7 @@ public final class ShelfStore {
         let fm = FileManager.default
         do {
             if !fm.fileExists(atPath: fileURL.path) {
-                try write([]) // create an empty shelf, like the VS Code extension
+                try write([]) // create an empty shelf
                 items = []
                 loadError = nil
                 return

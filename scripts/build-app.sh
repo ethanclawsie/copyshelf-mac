@@ -12,7 +12,7 @@ BUILD="${BUILD:-$(git rev-list --count HEAD 2>/dev/null || echo 1)}"
 APP="dist/CopyShelf.app"
 
 echo "▸ Building CopyShelf $VERSION ($BUILD)"
-swift build -c release --arch arm64 --product CopyShelf -Xswiftc -Osize >/dev/null
+swift build -c release --arch arm64 --product CopyShelf -Xswiftc -Osize -Xswiftc -gnone -Xlinker -dead_strip >/dev/null
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
