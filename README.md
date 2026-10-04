@@ -29,7 +29,8 @@ xattr -dr com.apple.quarantine /Applications/CopyShelf.app
 - **Click an item** (or its copy icon) to copy its text. By default the panel closes so you can paste right away with ⌘V.
 - **+** adds an item; the **pencil** edits it inline; the **trash** deletes it (with confirmation).
 - The **chevron** expands a preview of the full text.
-- The **⋯** menu has: Launch at Login, Close After Copying, Open Storage File, Reveal in Finder, Import…, Export…, Quit.
+- **Mouse Button Popup**: Choose **Set Popup Mouse Button…** in the **⋯** menu to bind any mouse button (e.g. middle-click or side buttons) to summon the shelf right at your cursor.
+- The **⋯** menu has: Launch at Login, Close After Copying, Set Popup Mouse Button…, Open Storage File, Reveal in Finder, Import…, Export…, Quit.
 
 ## Storage
 
