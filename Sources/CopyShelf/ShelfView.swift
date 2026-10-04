@@ -524,18 +524,29 @@ private struct EditorForm: View {
 
 // MARK: - Styles
 
-private struct IconButtonStyle: ButtonStyle {
-    @Environment(\.isEnabled) private var isEnabled
+private struct IconButtonBody: View {
+    let configuration: ButtonStyle.Configuration
+    let isEnabled: Bool
+    @State private var isHovering = false
 
-    func makeBody(configuration: Configuration) -> some View {
+    var body: some View {
         configuration.label
             .font(.system(size: 12))
             .frame(width: 24, height: 22)
             .contentShape(Rectangle())
             .background(
                 RoundedRectangle(cornerRadius: 5)
-                    .fill(Color.primary.opacity(configuration.isPressed ? 0.15 : 0))
+                    .fill(Color.primary.opacity(configuration.isPressed ? 0.15 : (isHovering && isEnabled ? 0.08 : 0)))
             )
             .opacity(isEnabled ? 1 : 0.35)
+            .onHover { isHovering = $0 }
+    }
+}
+
+private struct IconButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        IconButtonBody(configuration: configuration, isEnabled: isEnabled)
     }
 }
