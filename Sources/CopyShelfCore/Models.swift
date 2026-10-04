@@ -62,7 +62,7 @@ public enum ShelfFormat {
         return items
     }
 
-    /// Produces the same bytes as the extension's `JSON.stringify(data, null, 2) + "\n"`.
+    /// Produces standard 2-space indented JSON with a trailing newline.
     /// (JSONEncoder doesn't guarantee key order, so the layout is written by hand.)
     public static func encode(_ items: [ShelfItem]) throws -> Data {
         guard !items.isEmpty else { return Data("{\n  \"version\": 1,\n  \"items\": []\n}\n".utf8) }

@@ -20,6 +20,10 @@ struct ShelfView: View {
     @State private var launchAtLogin = LaunchAtLogin.isEnabled
     @State private var showPermissionHint = false
 
+    @State private var searchText = ""
+    @FocusState private var isSearchFocused: Bool
+    @State private var targetedDropID: String?
+
     private enum Editing: Equatable {
         case new
         case item(String)
@@ -27,9 +31,25 @@ struct ShelfView: View {
 
     private let maxListHeight: CGFloat = 440
 
+    private var isFiltering: Bool {
+        !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var filteredItems: [ShelfItem] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return store.items }
+        return store.items.filter {
+            $0.title.localizedCaseInsensitiveContains(query) ||
+            $0.text.localizedCaseInsensitiveContains(query)
+        }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             header
+            if !store.items.isEmpty {
+                searchBar
+            }
             Divider()
 
             if let loadError = store.loadError {
@@ -58,6 +78,8 @@ struct ShelfView: View {
 
             if store.items.isEmpty {
                 if editing == nil && store.loadError == nil { emptyState }
+            } else if filteredItems.isEmpty {
+                noSearchResultsState
             } else {
                 itemList
             }
@@ -75,6 +97,12 @@ struct ShelfView: View {
             footer
         }
         .frame(width: 340)
+        .background {
+            Button("") { isSearchFocused = true }
+                .keyboardShortcut("f", modifiers: .command)
+                .hidden()
+        }
+        .onExitCommand(perform: handleEscape)
         .onAppear(perform: refresh)
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
             refresh()
@@ -87,6 +115,7 @@ struct ShelfView: View {
         HStack {
             Text("CopyShelf").font(.headline)
             Spacer()
+
             Button {
                 inlineError = nil
                 editing = .new
@@ -94,17 +123,57 @@ struct ShelfView: View {
                 Image(systemName: "plus")
             }
             .buttonStyle(IconButtonStyle())
-            .help("Add Item")
+            .help("Add Item (⌘N)")
+            .keyboardShortcut("n", modifiers: .command)
             .disabled(store.loadError != nil)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
     }
 
+    private var searchBar: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+
+            TextField("Search snippets…", text: $searchText)
+                .textFieldStyle(.plain)
+                .font(.callout)
+                .focused($isSearchFocused)
+                .onAppear { isSearchFocused = true }
+                .onSubmit {
+                    if let first = filteredItems.first {
+                        copy(first)
+                    }
+                }
+
+            if !searchText.isEmpty {
+                Button {
+                    searchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Clear search")
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color.primary.opacity(0.06))
+        )
+        .padding(.horizontal, 12)
+        .padding(.bottom, 6)
+    }
+
     private var itemList: some View {
         ScrollView {
             VStack(spacing: 0) {
-                ForEach(store.items) { item in
+                ForEach(Array(filteredItems.enumerated()), id: \.element.id) { index, item in
                     if editing == .item(item.id) {
                         EditorForm(title: item.title, text: item.text, saveLabel: "Save") { title, text in
                             if perform({ try store.update(id: item.id, title: title, text: text) }) { onFinish?() }
@@ -117,8 +186,16 @@ struct ShelfView: View {
                             isExpanded: expanded.contains(item.id),
                             isCopied: copiedID == item.id,
                             isConfirmingDelete: confirmingDeleteID == item.id,
+                            canMoveUp: index > 0 && !isFiltering,
+                            canMoveDown: index < store.items.count - 1 && !isFiltering,
+                            isReorderingEnabled: !isFiltering,
+                            isDropTarget: targetedDropID == item.id,
                             onCopy: { copy(item) },
                             onToggle: { toggle(item.id) },
+                            onMoveUp: { moveUp(item.id) },
+                            onMoveDown: { moveDown(item.id) },
+                            onMoveDrop: { sourceID in reorder(from: sourceID, to: item.id) },
+                            onTargetDrop: { targeted in targetedDropID = targeted ? item.id : nil },
                             onEdit: {
                                 inlineError = nil
                                 confirmingDeleteID = nil
@@ -132,13 +209,29 @@ struct ShelfView: View {
                             onCancelDelete: { confirmingDeleteID = nil }
                         )
                     }
-                    if item.id != store.items.last?.id { Divider().padding(.horizontal, 10) }
+                    if item.id != filteredItems.last?.id { Divider().padding(.horizontal, 10) }
                 }
             }
             .padding(.vertical, 4)
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { listHeight = $0 }
         }
         .frame(height: min(max(listHeight, 1), maxListHeight))
+    }
+
+    private var noSearchResultsState: some View {
+        VStack(spacing: 6) {
+            Text("No matches for “\(searchText)”")
+                .font(.callout.weight(.medium))
+                .foregroundStyle(.secondary)
+            Button("Clear Search") {
+                searchText = ""
+            }
+            .controlSize(.small)
+            .padding(.top, 2)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 24)
+        .padding(.horizontal, 16)
     }
 
     private var emptyState: some View {
@@ -194,9 +287,15 @@ struct ShelfView: View {
 
     private var footer: some View {
         HStack {
-            Text(store.items.count == 1 ? "1 item" : "\(store.items.count) items")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            if isFiltering {
+                Text("\(filteredItems.count) of \(store.items.count) \(store.items.count == 1 ? "item" : "items")")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                Text(store.items.count == 1 ? "1 item" : "\(store.items.count) items")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             Spacer()
             Menu {
                 Toggle("Launch at Login", isOn: Binding(
@@ -239,6 +338,53 @@ struct ShelfView: View {
         launchAtLogin = LaunchAtLogin.isEnabled
         trigger.refresh()
         if AXIsProcessTrusted() { showPermissionHint = false }
+        searchText = ""
+        targetedDropID = nil
+        DispatchQueue.main.async {
+            isSearchFocused = true
+        }
+    }
+
+    private func handleEscape() {
+        if editing != nil {
+            editing = nil
+        } else if !searchText.isEmpty {
+            searchText = ""
+        } else {
+            dismissShelf()
+        }
+    }
+
+    private func dismissShelf() {
+        if let onFinish {
+            onFinish()
+        } else {
+            NSApp.keyWindow?.close()
+        }
+    }
+
+    private func moveUp(_ id: String) {
+        _ = withAnimation(.easeInOut(duration: 0.12)) {
+            perform { try store.moveUp(id: id) }
+        }
+    }
+
+    private func moveDown(_ id: String) {
+        _ = withAnimation(.easeInOut(duration: 0.12)) {
+            perform { try store.moveDown(id: id) }
+        }
+    }
+
+    private func reorder(from sourceID: String, to targetID: String) {
+        guard sourceID != targetID else { return }
+        guard let fromIndex = store.items.firstIndex(where: { $0.id == sourceID }),
+              let toIndex = store.items.firstIndex(where: { $0.id == targetID }) else { return }
+        _ = withAnimation(.easeInOut(duration: 0.12)) {
+            perform {
+                let toOffset = toIndex > fromIndex ? toIndex + 1 : toIndex
+                try store.move(fromOffsets: IndexSet(integer: fromIndex), toOffset: toOffset)
+            }
+        }
     }
 
     private func recordButton() {
@@ -352,8 +498,16 @@ private struct ItemRow: View {
     let isExpanded: Bool
     let isCopied: Bool
     let isConfirmingDelete: Bool
+    let canMoveUp: Bool
+    let canMoveDown: Bool
+    let isReorderingEnabled: Bool
+    let isDropTarget: Bool
     let onCopy: () -> Void
     let onToggle: () -> Void
+    let onMoveUp: () -> Void
+    let onMoveDown: () -> Void
+    let onMoveDrop: (String) -> Void
+    let onTargetDrop: (Bool) -> Void
     let onEdit: () -> Void
     let onDelete: () -> Void
     let onConfirmDelete: () -> Void
@@ -393,19 +547,35 @@ private struct ItemRow: View {
                 .buttonStyle(.plain)
                 .help("Click to copy")
 
-                Group {
+                HStack(spacing: 2) {
+                    if isReorderingEnabled {
+                        Button(action: onMoveUp) {
+                            Image(systemName: "chevron.up")
+                        }
+                        .help("Move Up (⌥↑)")
+                        .disabled(!canMoveUp)
+
+                        Button(action: onMoveDown) {
+                            Image(systemName: "chevron.down")
+                        }
+                        .help("Move Down (⌥↓)")
+                        .disabled(!canMoveDown)
+                    }
+
                     Button(action: onCopy) {
                         Image(systemName: isCopied ? "checkmark" : "doc.on.doc")
                             .foregroundStyle(isCopied ? Color.green : Color.primary)
                     }
                     .help("Copy")
+
                     Button(action: onEdit) { Image(systemName: "pencil") }
                         .help("Edit")
+
                     Button(action: onDelete) { Image(systemName: "trash") }
                         .help("Delete")
                 }
                 .buttonStyle(IconButtonStyle())
-                .opacity(isHovering || isCopied ? 1 : 0.55)
+                .opacity(isHovering || isCopied ? 1 : 0)
             }
 
             if isExpanded {
@@ -441,6 +611,60 @@ private struct ItemRow: View {
                 .fill(isHovering ? Color.primary.opacity(0.06) : .clear)
                 .padding(.horizontal, 4)
         )
+        .overlay(alignment: .top) {
+            if isDropTarget && isReorderingEnabled {
+                Rectangle()
+                    .fill(Color.accentColor)
+                    .frame(height: 2)
+                    .padding(.horizontal, 6)
+            }
+        }
+        .contextMenu {
+            Button(action: onCopy) {
+                Label("Copy", systemImage: "doc.on.doc")
+            }
+            Divider()
+            if isReorderingEnabled {
+                Button(action: onMoveUp) {
+                    Label("Move Up", systemImage: "arrow.up")
+                }
+                .disabled(!canMoveUp)
+                .keyboardShortcut(.upArrow, modifiers: .option)
+
+                Button(action: onMoveDown) {
+                    Label("Move Down", systemImage: "arrow.down")
+                }
+                .disabled(!canMoveDown)
+                .keyboardShortcut(.downArrow, modifiers: .option)
+                Divider()
+            }
+            Button(action: onEdit) {
+                Label("Edit…", systemImage: "pencil")
+            }
+            Button(role: .destructive, action: onDelete) {
+                Label("Delete…", systemImage: "trash")
+            }
+        }
+        .draggable(item.id) {
+            HStack(spacing: 6) {
+                Image(systemName: "doc.text")
+                Text(item.title)
+                    .fontWeight(.medium)
+            }
+            .font(.caption)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(RoundedRectangle(cornerRadius: 6).fill(.regularMaterial))
+        }
+        .dropDestination(for: String.self) { droppedIDs, _ in
+            guard isReorderingEnabled, let sourceID = droppedIDs.first else { return false }
+            onMoveDrop(sourceID)
+            return true
+        } isTargeted: { targeted in
+            if isReorderingEnabled {
+                onTargetDrop(targeted)
+            }
+        }
         .onHover { isHovering = $0 }
     }
 
@@ -531,14 +755,14 @@ private struct IconButtonBody: View {
 
     var body: some View {
         configuration.label
-            .font(.system(size: 12))
-            .frame(width: 24, height: 22)
+            .font(.system(size: 11))
+            .frame(width: 22, height: 20)
             .contentShape(Rectangle())
             .background(
-                RoundedRectangle(cornerRadius: 5)
+                RoundedRectangle(cornerRadius: 4)
                     .fill(Color.primary.opacity(configuration.isPressed ? 0.15 : (isHovering && isEnabled ? 0.08 : 0)))
             )
-            .opacity(isEnabled ? 1 : 0.35)
+            .opacity(isEnabled ? 1 : 0.25)
             .onHover { isHovering = $0 }
     }
 }

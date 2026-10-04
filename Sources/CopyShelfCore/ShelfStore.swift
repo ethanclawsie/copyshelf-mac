@@ -78,6 +78,45 @@ public final class ShelfStore {
         try mutate { $0.removeAll { $0.id == id } }
     }
 
+    /// Moves an item up one position in the shelf.
+    public func moveUp(id: String) throws {
+        reloadIfChanged()
+        guard let index = items.firstIndex(where: { $0.id == id }) else { throw ShelfError.itemNotFound }
+        guard index > 0 else { return }
+        try mutate { items in
+            guard let idx = items.firstIndex(where: { $0.id == id }), idx > 0 else { return }
+            items.swapAt(idx, idx - 1)
+        }
+    }
+
+    /// Moves an item down one position in the shelf.
+    public func moveDown(id: String) throws {
+        reloadIfChanged()
+        guard let index = items.firstIndex(where: { $0.id == id }) else { throw ShelfError.itemNotFound }
+        guard index < items.count - 1 else { return }
+        try mutate { items in
+            guard let idx = items.firstIndex(where: { $0.id == id }), idx < items.count - 1 else { return }
+            items.swapAt(idx, idx + 1)
+        }
+    }
+
+    /// Reorders items using index offsets.
+    public func move(fromOffsets source: IndexSet, toOffset destination: Int) throws {
+        guard !source.isEmpty else { return }
+        try mutate { items in
+            guard source.allSatisfy({ items.indices.contains($0) }) else { return }
+            var newItems = items
+            let moving = source.map { items[$0] }
+            for index in source.sorted(by: >) {
+                newItems.remove(at: index)
+            }
+            let adjustedDestination = destination - source.filter { $0 < destination }.count
+            let clamped = min(max(0, adjustedDestination), newItems.count)
+            newItems.insert(contentsOf: moving, at: clamped)
+            items = newItems
+        }
+    }
+
     /// Replaces the whole shelf. Allowed even when the current file is malformed — this is
     /// the documented way to recover.
     public func replace(with newItems: [ShelfItem]) throws {

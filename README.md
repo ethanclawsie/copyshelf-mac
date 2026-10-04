@@ -36,6 +36,8 @@ xattr -dr com.apple.quarantine /Applications/CopyShelf.app
 ## Using CopyShelf
 
 - **Click an item** (or its copy icon) to copy its text. By default the panel closes so you can paste right away with ⌘V.
+- **Search & Filter**: Type in the search bar to filter instantly. Press **Return** to copy the top match, or **Esc** to clear/dismiss.
+- **Reorder**: Drag and drop items to reorder them, use the hover arrows, or right-click any item for Move Up / Move Down.
 - **+** adds an item; the **pencil** edits it inline; the **trash** deletes it (with confirmation).
 - The **chevron** expands a preview of the full text.
 - **Mouse Button Popup**: Choose **Set Popup Mouse Button…** in the **⋯** menu to bind any mouse button (e.g. middle-click or side buttons) to summon the shelf right at your cursor.

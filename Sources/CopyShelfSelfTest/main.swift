@@ -193,6 +193,48 @@ func tempFile() -> URL {
         try store.export(to: dest)
         check(try ShelfStore.read(from: dest) == store.items, "round-trips")
     }
+
+    print("• Reorders items and persists to disk")
+    do {
+        let url = tempFile()
+        let store = ShelfStore(fileURL: url)
+        _ = try store.add(title: "A", text: "1")
+        let b = try store.add(title: "B", text: "2")
+        let c = try store.add(title: "C", text: "3")
+
+        // Move B up: should become [B, A, C]
+        try store.moveUp(id: b.id)
+        check(store.items.map(\.title) == ["B", "A", "C"], "moveUp swapped items")
+
+        // Moving B up again is a no-op (already at top)
+        try store.moveUp(id: b.id)
+        check(store.items.map(\.title) == ["B", "A", "C"], "moveUp at top is no-op")
+
+        // Move B down: should become [A, B, C]
+        try store.moveDown(id: b.id)
+        check(store.items.map(\.title) == ["A", "B", "C"], "moveDown swapped items")
+
+        // Move C down is a no-op (already at bottom)
+        try store.moveDown(id: c.id)
+        check(store.items.map(\.title) == ["A", "B", "C"], "moveDown at bottom is no-op")
+
+        // Move offsets: move C (index 2) to offset 0 -> [C, A, B]
+        try store.move(fromOffsets: IndexSet(integer: 2), toOffset: 0)
+        check(store.items.map(\.title) == ["C", "A", "B"], "move fromOffsets to front")
+
+        // Move C (index 0) to offset 3 -> [A, B, C]
+        try store.move(fromOffsets: IndexSet(integer: 0), toOffset: 3)
+        check(store.items.map(\.title) == ["A", "B", "C"], "move fromOffsets to end")
+
+        // Verify persistence across reload
+        let relaunched = ShelfStore(fileURL: url)
+        check(relaunched.items.map(\.title) == ["A", "B", "C"], "reordered items persisted to file")
+
+        // Non-existent ID errors
+        expectError(.itemNotFound, "moving non-existent item throws") {
+            try store.moveUp(id: "non-existent")
+        }
+    }
 }
 
 do {
