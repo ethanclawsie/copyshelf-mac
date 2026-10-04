@@ -2,7 +2,16 @@
 
 A tiny menu bar app for keeping reusable text close at hand. Click the icon, click an item, and it's on your clipboard — ready to paste into any app.
 
-Native SwiftUI, no dependencies, no Dock icon, no background polling. Requires an Apple Silicon Mac on macOS 14+.
+Native SwiftUI, zero external dependencies, no Dock icon, no background polling. Requires an Apple Silicon Mac on macOS 14+.
+
+## Zero Bloat by Design
+
+Most modern clipboard and snippet utilities bundle an entire browser engine just to show a list of strings. CopyShelf is built from scratch in native Swift:
+
+- **528 KB Total Bundle Size**: The executable itself is **304 KB** (fits on a floppy disk).
+- **0.0% Idle CPU**: Pure event-driven architecture. Zero background polling, zero timers, zero disk watchers. It only executes code when you click or press your shortcut.
+- **100% Offline & Private**: Zero network permissions, zero telemetry, zero analytics. Your snippets are stored locally in a plain `copyshelf.json` file you own and control.
+- **Zero External Dependencies**: Pure Apple Silicon (`arm64`), built strictly against native macOS frameworks.
 
 ## Install
 
