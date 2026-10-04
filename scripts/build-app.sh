@@ -24,8 +24,9 @@ sed -e "s/__VERSION__/$VERSION/" -e "s/__BUILD__/$BUILD/" Resources/Info.plist >
 cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 
-# Ad-hoc signature (free; no Apple Developer account). Required to run on Apple Silicon.
-codesign --force --sign - --timestamp=none "$APP"
+# Ad-hoc signature (free; no Apple Developer account) with a stable designated requirement
+# so rebuilding or upgrading the app doesn't break macOS Accessibility permissions.
+codesign --force --sign - --requirements '=designated => identifier "com.ethanclawsie.copyshelf"' --timestamp=none "$APP"
 codesign --verify --strict "$APP"
 
 echo "✓ $APP ($(du -sh "$APP" | cut -f1 | xargs), $(lipo -archs "$APP/Contents/MacOS/CopyShelf"))"

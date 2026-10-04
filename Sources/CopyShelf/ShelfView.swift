@@ -3,9 +3,12 @@ import CopyShelfCore
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// The drop-down panel shown from the menu bar icon.
+/// The shelf UI, shown from the menu bar icon and in the cursor popup.
 struct ShelfView: View {
     let store: ShelfStore
+    let trigger: MouseTrigger
+    /// Set in the cursor popup: called once an action completes (copy, add, edit) to close it.
+    var onFinish: (() -> Void)?
 
     @AppStorage("closeAfterCopy") private var closeAfterCopy = true
     @State private var editing: Editing?
@@ -15,6 +18,7 @@ struct ShelfView: View {
     @State private var inlineError: String?
     @State private var listHeight: CGFloat = 0
     @State private var launchAtLogin = LaunchAtLogin.isEnabled
+    @State private var showPermissionHint = false
 
     private enum Editing: Equatable {
         case new
@@ -32,9 +36,20 @@ struct ShelfView: View {
                 loadErrorBanner(loadError)
             }
 
+            if trigger.isRecording {
+                notice("Press the mouse button to use for the popup…", systemImage: "computermouse") {
+                    Button("Cancel") { trigger.cancelRecording() }
+                }
+            } else if showPermissionHint || trigger.needsPermission {
+                notice("Allow CopyShelf in Accessibility settings to use a popup mouse button, then try again.",
+                       systemImage: "lock") {
+                    Button("Open Settings") { MouseTrigger.openAccessibilitySettings() }
+                }
+            }
+
             if editing == .new {
                 EditorForm(title: "", text: "", saveLabel: "Add") { title, text in
-                    perform { try store.add(title: title, text: text) }
+                    if perform({ try store.add(title: title, text: text) }) { onFinish?() }
                 } onCancel: {
                     editing = nil
                 }
@@ -92,7 +107,7 @@ struct ShelfView: View {
                 ForEach(store.items) { item in
                     if editing == .item(item.id) {
                         EditorForm(title: item.title, text: item.text, saveLabel: "Save") { title, text in
-                            perform { try store.update(id: item.id, title: title, text: text) }
+                            if perform({ try store.update(id: item.id, title: title, text: text) }) { onFinish?() }
                         } onCancel: {
                             editing = nil
                         }
@@ -163,6 +178,20 @@ struct ShelfView: View {
         .background(Color.orange.opacity(0.12))
     }
 
+    private func notice<Actions: View>(
+        _ message: String, systemImage: String, @ViewBuilder actions: () -> Actions
+    ) -> some View {
+        HStack(spacing: 8) {
+            Label(message, systemImage: systemImage)
+                .font(.caption)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+            actions().controlSize(.small)
+        }
+        .padding(12)
+        .background(Color.accentColor.opacity(0.1))
+    }
+
     private var footer: some View {
         HStack {
             Text(store.items.count == 1 ? "1 item" : "\(store.items.count) items")
@@ -175,6 +204,14 @@ struct ShelfView: View {
                     set: { setLaunchAtLogin($0) }
                 ))
                 Toggle("Close After Copying", isOn: $closeAfterCopy)
+                Divider()
+                if let button = trigger.button {
+                    Text("Popup Button: \(MouseTrigger.name(of: button))")
+                    Button("Change Popup Button…", action: recordButton)
+                    Button("Remove Popup Button") { trigger.clear() }
+                } else {
+                    Button("Set Popup Mouse Button…", action: recordButton)
+                }
                 Divider()
                 Button("Open Storage File") { NSWorkspace.shared.open(store.fileURL) }
                 Button("Reveal in Finder") { revealStorage() }
@@ -200,14 +237,22 @@ struct ShelfView: View {
     private func refresh() {
         store.reloadIfChanged()
         launchAtLogin = LaunchAtLogin.isEnabled
+        trigger.refresh()
+        if AXIsProcessTrusted() { showPermissionHint = false }
+    }
+
+    private func recordButton() {
+        showPermissionHint = !trigger.startRecording()
     }
 
     private func copy(_ item: ShelfItem) {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString(item.text, forType: .string)
-        copiedID = item.id
 
+        if let onFinish { return onFinish() } // popup: close right away
+
+        copiedID = item.id
         Task {
             // Brief ✓ flash, then optionally close so ⌘V goes straight to the previous app.
             try? await Task.sleep(for: .milliseconds(closeAfterCopy ? 350 : 1200))
@@ -221,13 +266,16 @@ struct ShelfView: View {
     }
 
     /// Runs a store mutation; on success leaves edit mode, on failure shows the error inline.
-    private func perform(_ action: () throws -> Void) {
+    @discardableResult
+    private func perform(_ action: () throws -> Void) -> Bool {
         do {
             try action()
             editing = nil
             inlineError = nil
+            return true
         } catch {
             inlineError = error.localizedDescription
+            return false
         }
     }
 
